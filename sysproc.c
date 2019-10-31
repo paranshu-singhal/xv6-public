@@ -7,6 +7,30 @@
 #include "mmu.h"
 #include "proc.h"
 
+unsigned long numcalls = 0;
+
+int sys_info(void) {
+
+  //cprintf("sys_info in sysproc.c called\n");   
+    
+  int arg;
+  argint(0, &arg);
+
+  if(arg == 1){
+    cprintf("Number of processes running in the system are: %d\n", info());
+    return 0;
+  } else if(arg == 2){
+    cprintf("Number of system calls made by the process: %d\n", numcalls);
+    return 0;
+  } else if(arg == 3){
+    struct proc *curproc = myproc();
+    uint sz = curproc->sz;
+    cprintf("Memory occupied by the system: %d pages\n", (sz/4000));
+    return 0;
+  }
+  return -1;    
+}
+
 int
 sys_fork(void)
 {
@@ -89,3 +113,5 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
