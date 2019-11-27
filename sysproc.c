@@ -7,30 +7,6 @@
 #include "mmu.h"
 #include "proc.h"
 
-unsigned long numcalls = 0;
-
-int sys_info(void) {
-
-  //cprintf("sys_info in sysproc.c called\n");   
-    
-  int arg;
-  argint(0, &arg);
-
-  if(arg == 1){
-    cprintf("Number of processes running in the system are: %d\n", info());
-    return 0;
-  } else if(arg == 2){
-    cprintf("Number of system calls made by the process: %d\n", numcalls);
-    return 0;
-  } else if(arg == 3){
-    struct proc *curproc = myproc();
-    uint sz = curproc->sz;
-    cprintf("Memory occupied by the system: %d pages\n", (sz/4000));
-    return 0;
-  }
-  return -1;    
-}
-
 int
 sys_fork(void)
 {
@@ -113,5 +89,62 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+unsigned long numcalls = 0;
+
+int
+sys_info(void)
+{
+    //procdump();
+	int x;
+	int num;
+	argptr(0, (void *)&num, sizeof(num));
+	
+	if (num==1)
+	{
+	x = procCount();
+	cprintf("Count of processes in the system: %d\n", x);
+	
+	}
+	else if (num==2)
+	{
+		cprintf("Count of the total number of system calls that the current process has made so far: %d\n", numcalls);
+		
+	}
+	else if (num==3)
+	{
+		int memory=myproc()->sz;
+		int mem1=memory/4096;
+		cprintf("Number of memory pages the current process is using: %d\n", mem1);
+		
+	}
+	else
+	{
+		cprintf("Enter input 1,2 or 3");
+	}
+	
+	return -1;
+	
+}
+
+
+
+int
+sys_settickets(void) {
+  int tix;
+  if(argint(0, &tix) < 0)
+  	{return -1;}
+	myproc()->tickets = tix;
+	myproc()->stride = 10000 / tix;
+	return 0;
+}
+
+int
+sys_getusage(void) {
+  return myproc()->usage;
+}
+
+
+
 
 

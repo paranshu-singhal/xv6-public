@@ -106,6 +106,9 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_info(void);
+extern int sys_settickets(void);
+extern int sys_getusage(void);
+
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -129,21 +132,33 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-[SYS_info]    sys_info,
+[SYS_info]   sys_info,
+[SYS_settickets] sys_settickets,
+[SYS_getusage] sys_getusage,
 };
 
-void
-syscall(void){ 
 
-  //cprintf("syscall in syscall.c called\n");
-  
+void
+syscall(void)
+{
   int num;
+  
+  
   struct proc *curproc = myproc();
-  //cprintf("System call called %s\n", curproc->name);
+//if (curproc->name == "mycode")
+
+	
+
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     curproc->tf->eax = syscalls[num]();
-    numcalls++;
+	char currentProcess[] = "mycode";
+	
+	if (strncmp(curproc->name,currentProcess,6)==0)
+	{
+		
+	numcalls++;
+	}
   } else {
     cprintf("%d %s: unknown sys call %d\n",
             curproc->pid, curproc->name, num);

@@ -20,6 +20,11 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+int isCountingStarted=0;
+int quanta=-1;
+int schedSeq[100];
+int QUANTA_NUM=100;
+
 void
 pinit(void)
 {
@@ -88,6 +93,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tickets = 1;
+  p->pass = 0;
+  p->stride = 10000 / p->tickets;
 
   release(&ptable.lock);
 
@@ -231,6 +239,32 @@ exit(void)
   struct proc *p;
   int fd;
 
+  /*-------The following code is added to format the output--------*/
+  /* NOTE that you need to replace sched_times in the cprintf with whatever you use to record the execution time */
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
+  char *state;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+      state = states[p->state];
+    else
+      state = "???";
+    cprintf("From  %s-%d: %d %s %s sched_times=%d ticket=%d stride=%d \n", myproc()->name, myproc()->pid, p->pid, state, p->name, p->usage, p->tickets, p->stride);
+    //cprintf("From  %s-%d: %d %s %s tickets=%d stride=%d #timeSlices=%d \n", myproc()->name, myproc()->pid, p->pid, state, p->name, p->tickets, p->stride, p->usage);
+  }
+  /*------------------patch end------------------------ */
+
+
+
+
   if(curproc == initproc)
     panic("init exiting");
 
@@ -319,36 +353,95 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void
-scheduler(void)
+
+void scheduler(void)
 {
   struct proc *p;
+  struct proc *current;
   struct cpu *c = mycpu();
   c->proc = 0;
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
+    int minPass = -1;
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+	
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		
+      if(p->state != RUNNABLE)
+        continue;
+      if (minPass < 0 || p->pass < minPass){
+      	current = p;
+				minPass = p->pass;
+			}
+
+    }
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		
       if(p->state != RUNNABLE)
         continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      if (p->pass==minPass){
+        current=p;
+        c->proc=current;
+        current->pass += current->stride;
+        switchuvm(current);
+        current->state = RUNNING;
+        current->usage = current->usage+1;
+        //------------patch start: for visualization---------------------------
+        // if (isCountingStarted==0 && p->tickets >= 10)
+        // {
+        //   quanta=0;
+        //   isCountingStarted=1;
+        // }
+        // if (isCountingStarted == 1)
+        // {
+        //   schedSeq[quanta] = current->pid;
+        //   quanta++;
+        // }
+        // if(quanta == QUANTA_NUM)
+        // {
+        //   int a = schedSeq[0];
+        //   int b = schedSeq[1];
+        //   int c = schedSeq[2];
+        //   int counter1=0, counter2=0, counter3=0;
+        //   for (int i=0; i<QUANTA_NUM; i++)
+        //   {
+        //     if (schedSeq[i]==a)
+        //     {
+        //       counter1++;
+        //       cprintf("(%d,%d);",i,counter1);
+        //     }
+        //   }
+        //   cprintf("\n");
+        //   for (int i=0; i<QUANTA_NUM; i++)
+        //   {
+        //     if (schedSeq[i]==b)
+        //     {
+        //       counter2++;
+        //       cprintf("(%d,%d);",i,counter2);
+        //     }
+        //   }
+        //   cprintf("\n");
+        //   for (int i=0; i<QUANTA_NUM; i++)
+        //   {
+        //     if (schedSeq[i]==c)
+        //     { 
+        //       counter3++;
+        //       cprintf("(%d,%d);",i,counter3);
+        //     }
+        //   }
+        //   cprintf("\n");
+        // }
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
+//------------patch end: for visualization---------------------------
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
       c->proc = 0;
+      break;
+      }
     }
     release(&ptable.lock);
 
@@ -533,16 +626,18 @@ procdump(void)
   }
 }
 
-int info(){
-
+int procCount(void) {
   struct proc *p;
-
-  int process_count = 0;
+  
+  int count;
+  count=0;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state == UNUSED)
-      continue;
-    process_count++;
+    
+    if(p->state == UNUSED) continue;
+    else {
+      count++;
+    }
   }
-  return process_count;
+  return count;
 }
